@@ -83,6 +83,11 @@ COMET_MOCK=1 docker compose up --build
 4. Open the WebUI, click ⚙, and set your **billing cycle start** date plus (optional)
    delivery/tax values for total-bill mode.
 
+Deploying via the **Compose Manager** plugin instead of the template? See
+[INSTALL-UNRAID.md](INSTALL-UNRAID.md) — you must set `COMET_DATA_DIR` to an
+absolute `/mnt/user/appdata/...` path, or the default relative `./data` volume
+resolves onto the boot USB (vfat) and the container can't create its database.
+
 ---
 
 ## Configuration

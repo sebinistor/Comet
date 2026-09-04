@@ -65,7 +65,15 @@ Use **`comet:local`** as the Repository in step 3.
    and paste `.env.example` into the stack's `.env`, editing the values
    (see step 4 for what each one means).
 4. Set `build: .` to the full path, e.g. `build: /mnt/user/appdata/comet-build`.
-5. Click **Compose Up**. Skip to step 5 (initialization).
+5. **In the stack's `.env`, set `COMET_DATA_DIR=/mnt/user/appdata/comet`** (an
+   absolute path). Compose Manager stores stacks under
+   `/boot/config/plugins/compose.manager/projects/<name>/` — the boot USB, a vfat
+   filesystem with no real Unix permissions — so the compose file's default
+   relative `./data` volume resolves *there* instead of your appdata share, and
+   the container (which runs as a non-root user) can never create `comet.db`.
+   This is the single most common first-run failure on UNRAID; see
+   **Troubleshooting** below if you hit it.
+6. Click **Compose Up**. Skip to step 5 (initialization).
 
 ### Path C — Build elsewhere, load on UNRAID
 
@@ -235,6 +243,7 @@ start it again.
 
 | Symptom | Likely cause / fix |
 | --- | --- |
+| Container **restart-loops**, log ends in `sqlite3.OperationalError: unable to open database file` | Compose Manager (Path B) only: the compose file's `/data` volume is still the default relative `./data`, which Compose Manager resolves onto the boot USB (vfat — root-only, non-root container user can't write it). Set `COMET_DATA_DIR=/mnt/user/appdata/comet` in the stack's `.env` and recreate the stack. |
 | Dashboard loads but **"Drawing now" is blank** and `/api/health` shows `meter.ok:false` | Emporia login failing. Most common: **2FA enabled** on the Emporia account (turn it off), wrong password, or the server can't reach AWS. Check the container log for the exact error. |
 | **Price tile blank**, `prices.ok:false` | Server can't reach `https://hourlypricing.comed.com`. Check UNRAID's DNS / outbound firewall / VPN routing. |
 | Costs look **~3× too high or too low** | Comet assumes the whole‑home total is Emporia channel `"1,2,3"`. If your device reports the mains differently, the log will show which channels were found — this is a known limitation that may need a one‑line code change in `backend/app/providers/emporia.py`. |

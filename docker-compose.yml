@@ -16,4 +16,6 @@ services:
       PRICE_POLL_SECONDS: "${PRICE_POLL_SECONDS:-300}"
       METER_POLL_SECONDS: "${METER_POLL_SECONDS:-60}"
     volumes:
-      - ./data:/data
+      # Override COMET_DATA_DIR to an absolute path when deploying via UNRAID's
+      # Compose Manager plugin — see .env.example.
+      - ${COMET_DATA_DIR:-./data}:/data
