@@ -1,5 +1,7 @@
 # Comet
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Self-hosted dashboard for **ComEd Hourly Pricing** customers with an **Emporia Vue**
 energy monitor. It shows:
 
