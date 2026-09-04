@@ -1,0 +1,19 @@
+services:
+  comet:
+    build: .
+    image: comet:latest
+    container_name: comet
+    restart: unless-stopped
+    ports:
+      - "${COMET_PORT:-8080}:8080"
+    environment:
+      # Emporia cloud account (leave blank + set COMET_MOCK=1 to demo without a device)
+      EMPORIA_USERNAME: "${EMPORIA_USERNAME:-}"
+      EMPORIA_PASSWORD: "${EMPORIA_PASSWORD:-}"
+      EMPORIA_DEVICE_GIDS: "${EMPORIA_DEVICE_GIDS:-}"
+      COMET_TZ: "${COMET_TZ:-America/Chicago}"
+      COMET_MOCK: "${COMET_MOCK:-0}"
+      PRICE_POLL_SECONDS: "${PRICE_POLL_SECONDS:-300}"
+      METER_POLL_SECONDS: "${METER_POLL_SECONDS:-60}"
+    volumes:
+      - ./data:/data

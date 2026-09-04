@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Comet</Name>
+  <Repository>comet:latest</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>Self-hosted dashboard showing the current ComEd Hourly Pricing rate, a rolling estimated cost for today, and a rolling estimated cost for the current billing cycle, using real-time consumption from an Emporia Vue energy monitor. Build the image locally from the repo (docker build -t comet:latest .) or push it to your own registry, then point this template at it.</Overview>
+  <Category>HomeAutomation: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://hourlypricing.comed.com/wp-content/themes/comed-hourly/favicon.ico</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Description>ComEd Hourly Pricing + Emporia Vue electricity cost dashboard.</Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>8080</HostPort>
+        <ContainerPort>8080</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/comet</HostDir>
+      <ContainerDir>/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value/>
+      <Name>EMPORIA_USERNAME</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>EMPORIA_PASSWORD</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>EMPORIA_DEVICE_GIDS</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>America/Chicago</Value>
+      <Name>COMET_TZ</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>0</Value>
+      <Name>COMET_MOCK</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>300</Value>
+      <Name>PRICE_POLL_SECONDS</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>60</Value>
+      <Name>METER_POLL_SECONDS</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Labels/>
+  <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="Dashboard port" Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/comet" Mode="rw" Description="SQLite DB and Emporia token file" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/comet</Config>
+  <Config Name="Emporia Username" Target="EMPORIA_USERNAME" Default="" Description="Emporia account email" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Emporia Password" Target="EMPORIA_PASSWORD" Default="" Description="Emporia account password (only read on first login; tokens are cached in /data)" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Emporia Device GIDs" Target="EMPORIA_DEVICE_GIDS" Default="" Description="Comma-separated GIDs; blank = all devices" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Timezone" Target="COMET_TZ" Default="America/Chicago" Description="IANA timezone for day/cycle boundaries" Type="Variable" Display="always" Required="true" Mask="false">America/Chicago</Config>
+  <Config Name="Demo mode" Target="COMET_MOCK" Default="0" Description="1 = simulated data, no credentials needed" Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
+  <Config Name="Price poll seconds" Target="PRICE_POLL_SECONDS" Default="300" Description="ComEd price poll interval" Type="Variable" Display="advanced" Required="false" Mask="false">300</Config>
+  <Config Name="Meter poll seconds" Target="METER_POLL_SECONDS" Default="60" Description="Emporia poll interval" Type="Variable" Display="advanced" Required="false" Mask="false">60</Config>
+</Container>
