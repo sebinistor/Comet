@@ -118,7 +118,7 @@ UI settings (stored in the DB, editable from ⚙):
 | `GET /api/summary` | today + billing-cycle rollups and projection |
 | `GET /api/history?range=day\|cycle` | hourly price / kWh / cumulative cost series |
 | `GET /api/config` · `PUT /api/config` | read / update UI settings |
-| `GET /api/health` | scheduler + last-poll status |
+| `GET /api/health` | scheduler + per-poll status; `degraded` if a poll is failing or stale |
 
 ---
 
@@ -148,5 +148,5 @@ cd backend && pytest
   not a guaranteed match to your printed invoice.
 - The billing cycle is tracked by a single `billing_cycle_start` date — update it each
   invoice (or set it to your monthly meter-read day).
-- `pyemvue` uses Emporia's **unofficial** cloud API; poll failures are surfaced in
-  `/api/health` and the UI banner.
+- `pyemvue` uses Emporia's **unofficial** cloud API; poll failures — and pollers that
+  have gone silent — are surfaced in `/api/health` and the UI banner.

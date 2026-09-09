@@ -155,14 +155,19 @@ Wait ~60–90 seconds after the container starts, then from the server terminal:
 curl -s http://localhost:8080/api/health
 ```
 
-Expected — `status: "ok"`, `mock: false`, and every job `"ok": true`:
+Expected — `status: "ok"`, `mock: false`, and every job `"ok": true` with
+`"stale": false`:
 
 ```json
 {"status":"ok","mock":false,"scheduler_running":true,
- "jobs":{"prices":{"ok":true,...},
-         "meter":{"ok":true,...},
-         "backfill":{"ok":true,...}}}
+ "jobs":{"prices":{"ok":true,"stale":false,...},
+         "meter":{"ok":true,"stale":false,...},
+         "backfill":{"ok":true,"stale":false,...}}}
 ```
+
+`status` reads `"degraded"` if the scheduler has stopped, a poll is failing
+(`"ok": false`), or a poll has gone silent for longer than a few of its
+intervals (`"stale": true`).
 
 Then open the dashboard: **`http://<TOWER-IP>:8080/`** (or click **WebUI** on the
 container). Within a couple of minutes the price tile and "Drawing now" should
@@ -246,6 +251,7 @@ start it again.
 | Container **restart-loops**, log ends in `sqlite3.OperationalError: unable to open database file` | Compose Manager (Path B) only: the compose file's `/data` volume is still the default relative `./data`, which Compose Manager resolves onto the boot USB (vfat — root-only, non-root container user can't write it). Set `COMET_DATA_DIR=/mnt/user/appdata/comet` in the stack's `.env` and recreate the stack. |
 | Dashboard loads but **"Drawing now" is blank** and `/api/health` shows `meter.ok:false` | Emporia login failing. Most common: **2FA enabled** on the Emporia account (turn it off), wrong password, or the server can't reach AWS. Check the container log for the exact error. |
 | **Price tile blank**, `prices.ok:false` | Server can't reach `https://hourlypricing.comed.com`. Check UNRAID's DNS / outbound firewall / VPN routing. |
+| Dashboard **data frozen** / graph flat, but `/api/health` still shows every job `ok:true` | A poller has silently stopped. `/api/health` reports `status:"degraded"` with `"stale":true` on the affected job. Restart the container; check the log for what wedged the scheduler. |
 | Costs look **~3× too high or too low** | Comet assumes the whole‑home total is Emporia channel `"1,2,3"`. If your device reports the mains differently, the log will show which channels were found — this is a known limitation that may need a one‑line code change in `backend/app/providers/emporia.py`. |
 | `/api/health` shows `"mock": true` | `COMET_MOCK` is set to `1` — change it to `0` and restart. |
 | "This billing cycle" total seems to **start mid‑cycle** | You changed the cycle‑start date after first launch. Restart the container once to backfill. |
