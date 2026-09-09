@@ -159,12 +159,32 @@ def health(request: Request) -> HealthResponse:
     settings = get_settings()
     poller = getattr(request.app.state, "poller", None)
     running = bool(poller and poller.scheduler.running)
-    jobs = ingest.LAST_RUN
-    status = "ok"
-    if any(j.get("ok") is False for j in jobs.values()):
-        status = "degraded"
+
+    # A polling job should have run within a few of its own intervals; if it
+    # hasn't, the scheduler is wedged even though `ok` still reads True from the
+    # last success. `backfill` is one-shot, so staleness doesn't apply to it.
+    now = dt.datetime.now(tz=_UTC)
+    max_age = {
+        "prices": max(settings.price_poll_seconds * 3, 180),
+        "meter": max(settings.meter_poll_seconds * 3, 180),
+    }
+    jobs: dict[str, dict] = {}
+    for name, job in ingest.LAST_RUN.items():
+        limit = max_age.get(name)
+        at = job.get("at")
+        stale = False
+        if limit is not None:
+            ran_at = dt.datetime.fromisoformat(at) if at else None
+            stale = ran_at is None or (now - ran_at).total_seconds() > limit
+        jobs[name] = {**job, "stale": stale}
+
+    degraded = (
+        not running
+        or any(j.get("ok") is False for j in jobs.values())
+        or any(j.get("stale") for j in jobs.values())
+    )
     return HealthResponse(
-        status=status,
+        status="degraded" if degraded else "ok",
         mock=settings.comet_mock,
         scheduler_running=running,
         jobs=jobs,

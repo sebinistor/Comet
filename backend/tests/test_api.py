@@ -27,6 +27,21 @@ def test_health_reports_mock_and_scheduler(client):
     assert set(body["jobs"]) == {"prices", "meter", "backfill"}
 
 
+def test_health_ok_when_jobs_fresh(client):
+    body = client.get("/api/health").json()
+    assert body["status"] == "ok"
+    assert all(j["stale"] is False for j in body["jobs"].values())
+
+
+def test_health_degraded_when_polling_job_is_stale(client, monkeypatch):
+    old = (dt.datetime.now(tz=_UTC) - dt.timedelta(hours=6)).isoformat()
+    monkeypatch.setitem(ingest.LAST_RUN, "meter", {"ok": True, "at": old, "detail": "1 minute samples"})
+    body = client.get("/api/health").json()
+    assert body["status"] == "degraded"
+    assert body["jobs"]["meter"]["stale"] is True
+    assert body["jobs"]["prices"]["stale"] is False
+
+
 def test_now_has_price_and_power_after_bootstrap(client):
     body = client.get("/api/now").json()
     assert body["price_cents_per_kwh"] is not None

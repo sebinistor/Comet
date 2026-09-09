@@ -54,11 +54,18 @@ export interface ConfigModel {
   cost_mode: "supply" | "total";
 }
 
+export interface HealthJob {
+  ok: boolean | null;
+  at: string | null;
+  detail: string | null;
+  stale: boolean;
+}
+
 export interface HealthResponse {
   status: string;
   mock: boolean;
   scheduler_running: boolean;
-  jobs: Record<string, { ok: boolean | null; at: string | null; detail: string | null }>;
+  jobs: Record<string, HealthJob>;
 }
 
 async function get<T>(path: string): Promise<T> {

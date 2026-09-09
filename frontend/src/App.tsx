@@ -1,12 +1,21 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./lib/api";
+import { api, type HealthResponse } from "./lib/api";
 import { PriceTile } from "./components/PriceTile";
 import { RollingCostCard } from "./components/RollingCostCard";
 import { UsageChart } from "./components/UsageChart";
 import { SettingsForm } from "./components/SettingsForm";
 
 type Mode = "supply" | "total";
+
+function healthMessage(h: HealthResponse): string {
+  if (!h.scheduler_running) return "Background poller is not running — data is not updating.";
+  const stale = Object.keys(h.jobs).filter((k) => h.jobs[k].stale);
+  const failing = Object.keys(h.jobs).filter((k) => h.jobs[k].ok === false);
+  if (stale.length) return `Data collection has stalled (${stale.join(", ")}) — check /api/health.`;
+  if (failing.length) return `Some pollers are failing (${failing.join(", ")}) — check /api/health.`;
+  return "Service is degraded — check /api/health.";
+}
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -52,7 +61,7 @@ export default function App() {
       {health.data && (health.data.mock || health.data.status !== "ok") && (
         <div className={`banner ${health.data.status !== "ok" ? "warn" : "info"}`}>
           {health.data.mock && <span>Demo mode — showing simulated data. </span>}
-          {health.data.status !== "ok" && <span>Some pollers are failing — check /api/health.</span>}
+          {health.data.status !== "ok" && <span>{healthMessage(health.data)}</span>}
         </div>
       )}
 

@@ -77,6 +77,7 @@ class HealthJob(BaseModel):
     ok: bool | None
     at: dt.datetime | None
     detail: str | None
+    stale: bool = False  # last run is older than the job's expected cadence
 
 
 class HealthResponse(BaseModel):
