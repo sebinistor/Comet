@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -17,6 +18,9 @@ _LOG = logging.getLogger("comet.comed")
 
 API_URL = "https://hourlypricing.comed.com/api"
 _TS_FMT = "%Y%m%d%H%M"
+# The hp-api reads datestart/dateend as Central time (ComEd is a Chicago utility),
+# not UTC. Response timestamps are absolute (millisUTC) and unaffected.
+_API_TZ = ZoneInfo("America/Chicago")
 
 
 def _parse_feed(payload: list[dict], kind: str) -> list[PriceSample]:
@@ -55,8 +59,8 @@ class ComEdPriceProvider(PriceProvider):
     ) -> list[PriceSample]:
         params: dict[str, str] = {"type": "5minutefeed"}
         if start and end:
-            params["datestart"] = start.astimezone(dt.timezone.utc).strftime(_TS_FMT)
-            params["dateend"] = end.astimezone(dt.timezone.utc).strftime(_TS_FMT)
+            params["datestart"] = start.astimezone(_API_TZ).strftime(_TS_FMT)
+            params["dateend"] = end.astimezone(_API_TZ).strftime(_TS_FMT)
         payload = await self._get(params)
         samples = _parse_feed(payload, "5min")
         _LOG.debug("comed 5minutefeed: %d samples", len(samples))
