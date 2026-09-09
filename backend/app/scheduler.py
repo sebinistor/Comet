@@ -22,6 +22,10 @@ class Poller:
 
     async def start(self) -> None:
         s = self.settings
+        # NB: do not pass ``next_run_time=None`` here -- APScheduler reads that as
+        # "add the job paused", so the interval never fires and the only data we
+        # ever get is the one-shot ``_bootstrap`` below. Omitting it lets the
+        # trigger schedule the first run at now + interval.
         self.scheduler.add_job(
             self._run_prices,
             "interval",
@@ -29,7 +33,6 @@ class Poller:
             id="prices",
             max_instances=1,
             coalesce=True,
-            next_run_time=None,
         )
         self.scheduler.add_job(
             self._run_meter,
@@ -38,7 +41,6 @@ class Poller:
             id="meter",
             max_instances=1,
             coalesce=True,
-            next_run_time=None,
         )
         self.scheduler.start()
         _LOG.info(
