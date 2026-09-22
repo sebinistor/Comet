@@ -54,6 +54,16 @@ export interface ConfigModel {
   cost_mode: "supply" | "total";
 }
 
+export interface CycleHistoryItem {
+  cycle_start: string;
+  cycle_end: string;
+  days: number;
+  kwh: number;
+  supply_cost: number;
+  total_cost: number;
+  cost_mode: "supply" | "total";
+}
+
 export interface HealthJob {
   ok: boolean | null;
   at: string | null;
@@ -79,6 +89,7 @@ export const api = {
   summary: () => get<SummaryResponse>("/api/summary"),
   history: (range: "day" | "cycle") => get<HistoryResponse>(`/api/history?range=${range}`),
   config: () => get<ConfigModel>("/api/config"),
+  cycles: () => get<CycleHistoryItem[]>("/api/cycles"),
   health: () => get<HealthResponse>("/api/health"),
   updateConfig: async (patch: Partial<ConfigModel>): Promise<ConfigModel> => {
     const res = await fetch("/api/config", {

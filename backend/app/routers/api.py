@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import Consumption, Price, get_all_settings, update_settings
+from app.models import Consumption, CycleHistory, Price, get_all_settings, update_settings
 from app.schemas import (
     ConfigModel,
     ConfigUpdate,
+    CycleHistoryItem,
     HealthResponse,
     HistoryResponse,
     NowResponse,
@@ -138,6 +139,15 @@ def history(
         cursor += dt.timedelta(hours=1)
 
     return HistoryResponse(range=range, start=start, end=end, points=points)
+
+
+@router.get("/cycles", response_model=list[CycleHistoryItem])
+def cycles(session: Session = Depends(get_session)) -> list[CycleHistoryItem]:
+    """Auto-archived past billing cycles, most recent first."""
+    rows = session.execute(
+        select(CycleHistory).order_by(CycleHistory.cycle_start.desc()).limit(24)
+    ).scalars().all()
+    return [CycleHistoryItem(**{k: getattr(r, k) for k in CycleHistoryItem.model_fields}) for r in rows]
 
 
 @router.get("/config", response_model=ConfigModel)

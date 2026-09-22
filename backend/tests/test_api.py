@@ -65,6 +65,11 @@ def test_config_round_trip(client):
     assert cfg["delivery_cents_per_kwh"] == 4.5
 
 
+def test_cycles_endpoint_returns_list(client):
+    body = client.get("/api/cycles").json()
+    assert isinstance(body, list)
+
+
 def test_history_day_returns_hourly_points(client):
     body = client.get("/api/history?range=day").json()
     assert body["range"] == "day"

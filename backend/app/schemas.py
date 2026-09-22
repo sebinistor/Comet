@@ -73,6 +73,16 @@ class ConfigUpdate(BaseModel):
     cost_mode: Literal["supply", "total"] | None = None
 
 
+class CycleHistoryItem(BaseModel):
+    cycle_start: dt.date
+    cycle_end: dt.date
+    days: float
+    kwh: float
+    supply_cost: float
+    total_cost: float
+    cost_mode: Literal["supply", "total"]
+
+
 class HealthJob(BaseModel):
     ok: bool | None
     at: dt.datetime | None

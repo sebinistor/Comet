@@ -5,8 +5,8 @@ import datetime as dt
 import pytest
 
 from app.db import session_scope
-from app.models import Consumption, Price, update_settings
-from app.services.costing import compute_rollup
+from app.models import Consumption, CycleHistory, Price, get_all_settings, update_settings
+from app.services.costing import close_due_cycles, compute_rollup
 
 _UTC = dt.timezone.utc
 
@@ -83,6 +83,51 @@ def test_default_price_used_when_no_price_rows():
         s.add(Consumption(ts_utc=start, device_gid="x", kwh=3.0, resolution="hour"))
     r = compute_rollup(_session(), start, start + dt.timedelta(hours=1), default_price_cents=8.0)
     assert r.supply_cost == pytest.approx(3.0 * 8.0 / 100.0)
+
+
+@pytest.mark.usefixtures("clean_db")
+def test_close_due_cycles_archives_and_advances_start():
+    tz = dt.timezone.utc
+    old_start = dt.date.today() - dt.timedelta(days=40)
+    update_settings({"billing_cycle_start": old_start.isoformat(), "billing_cycle_days": 29})
+    start = dt.datetime(old_start.year, old_start.month, old_start.day, tzinfo=tz)
+    _seed_flat(price_cents=10.0, kwh_per_hour=1.0, hours=29 * 24, start=start)
+
+    closed = close_due_cycles(tz)
+
+    assert len(closed) == 1
+    assert closed[0]["cycle_start"] == old_start
+    assert closed[0]["cycle_end"] == old_start + dt.timedelta(days=29)
+    # 29*24 kWh * 10c = $69.60
+    assert closed[0]["supply_cost"] == pytest.approx(69.60)
+
+    cfg = get_all_settings()
+    assert cfg["billing_cycle_start"] == (old_start + dt.timedelta(days=29)).isoformat()
+
+    with session_scope() as s:
+        assert s.query(CycleHistory).count() == 1
+
+
+@pytest.mark.usefixtures("clean_db")
+def test_close_due_cycles_is_idempotent():
+    tz = dt.timezone.utc
+    old_start = dt.date.today() - dt.timedelta(days=35)
+    update_settings({"billing_cycle_start": old_start.isoformat(), "billing_cycle_days": 29})
+    start = dt.datetime(old_start.year, old_start.month, old_start.day, tzinfo=tz)
+    _seed_flat(price_cents=10.0, kwh_per_hour=1.0, hours=29 * 24, start=start)
+
+    first = close_due_cycles(tz)
+    second = close_due_cycles(tz)
+
+    assert len(first) == 1
+    assert len(second) == 0  # nothing newly due; already advanced past it
+    with session_scope() as s:
+        assert s.query(CycleHistory).count() == 1
+
+
+@pytest.mark.usefixtures("clean_db")
+def test_close_due_cycles_noop_when_cycle_still_open():
+    assert close_due_cycles(dt.timezone.utc) == []
 
 
 def _session():

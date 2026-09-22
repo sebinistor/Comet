@@ -17,9 +17,11 @@ import datetime as dt
 from dataclasses import dataclass
 
 from sqlalchemy import select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from app.models import Consumption, Price, get_all_settings
+from app.db import session_scope
+from app.models import Consumption, CycleHistory, Price, get_all_settings, update_settings
 
 _UTC = dt.timezone.utc
 
@@ -131,6 +133,62 @@ def compute_rollup(
 def _cycle_start_dt(cfg: dict, tz: dt.tzinfo) -> dt.datetime:
     d = dt.date.fromisoformat(str(cfg["billing_cycle_start"]))
     return dt.datetime(d.year, d.month, d.day, tzinfo=tz)
+
+
+def _latest_price_cents(session: Session) -> float:
+    row = session.execute(
+        select(Price).where(Price.kind == "hour_avg").order_by(Price.ts_utc.desc()).limit(1)
+    ).scalars().first()
+    if row is None:
+        row = session.execute(
+            select(Price).where(Price.kind == "5min").order_by(Price.ts_utc.desc()).limit(1)
+        ).scalars().first()
+    return row.price_cents if row else 0.0
+
+
+def close_due_cycles(tz: dt.tzinfo) -> list[dict]:
+    """Archive any billing cycle(s) whose nominal length has fully elapsed and
+    advance ``billing_cycle_start`` past them.
+
+    Idempotent (``cycle_start`` is unique on :class:`CycleHistory`), so it's
+    safe to call on every restart and on a recurring schedule — this is what
+    makes "day 35 of a 29-day cycle" self-correct instead of needing a manual
+    settings edit. Loops in case the app was offline across more than one
+    cycle boundary.
+    """
+    cfg = get_all_settings()
+    cycle_days = float(cfg.get("billing_cycle_days", 30))
+    cost_mode = cfg.get("cost_mode", "supply")
+    cycle_start = _cycle_start_dt(cfg, tz)
+    now = dt.datetime.now(tz=tz)
+
+    closed: list[dict] = []
+    while now >= cycle_start + dt.timedelta(days=cycle_days):
+        cycle_end = cycle_start + dt.timedelta(days=cycle_days)
+        with session_scope() as session:
+            fallback = _latest_price_cents(session)
+            rollup = compute_rollup(
+                session, cycle_start, cycle_end, settings=cfg, default_price_cents=fallback
+            )
+            record = {
+                "cycle_start": cycle_start.date(),
+                "cycle_end": cycle_end.date(),
+                "days": cycle_days,
+                "kwh": rollup.kwh,
+                "supply_cost": rollup.supply_cost,
+                "total_cost": rollup.total_cost,
+                "cost_mode": cost_mode,
+            }
+            stmt = sqlite_insert(CycleHistory).values(**record)
+            stmt = stmt.on_conflict_do_nothing(index_elements=["cycle_start"])
+            session.execute(stmt)
+        closed.append(record)
+        cycle_start = cycle_end
+
+    if closed:
+        update_settings({"billing_cycle_start": cycle_start.date().isoformat()})
+
+    return closed
 
 
 def build_summary(session: Session, tz: dt.tzinfo, *, default_price_cents: float = 0.0) -> dict:

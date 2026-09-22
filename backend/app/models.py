@@ -15,7 +15,7 @@ import datetime as dt
 import json
 from typing import Any
 
-from sqlalchemy import Float, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, Float, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.db import SessionLocal
@@ -48,6 +48,28 @@ class Consumption(Base):
     # "minute" (live polling) or "hour" (historical backfill). Lets rollups avoid
     # double-counting an hour that has both, and lets the chart pick a grain.
     resolution: Mapped[str] = mapped_column(String(8), default="minute")
+
+
+class CycleHistory(Base):
+    """A billing cycle that has fully elapsed and been auto-archived.
+
+    Written once by :func:`app.services.costing.close_due_cycles` when the
+    live cycle rolls over; ``cycle_start`` is unique so re-running that check
+    (e.g. on every restart) can't double-archive the same cycle.
+    """
+
+    __tablename__ = "cycle_history"
+    __table_args__ = (UniqueConstraint("cycle_start", name="uq_cycle_history_start"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    cycle_start: Mapped[dt.date] = mapped_column(Date)
+    cycle_end: Mapped[dt.date] = mapped_column(Date)
+    days: Mapped[float] = mapped_column(Float)
+    kwh: Mapped[float] = mapped_column(Float)
+    supply_cost: Mapped[float] = mapped_column(Float)
+    total_cost: Mapped[float] = mapped_column(Float)
+    cost_mode: Mapped[str] = mapped_column(String(16))
+    closed_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
 
 
 class Setting(Base):

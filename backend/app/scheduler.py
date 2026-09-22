@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import get_settings
 from app.providers import build_providers
-from app.services import ingest
+from app.services import costing, ingest
 
 _LOG = logging.getLogger("comet.scheduler")
 
@@ -42,6 +42,16 @@ class Poller:
             max_instances=1,
             coalesce=True,
         )
+        # Cheap date check, not data volume -- hourly is plenty often to catch
+        # a cycle rollover the same day it happens.
+        self.scheduler.add_job(
+            self._run_cycle_check,
+            "interval",
+            seconds=3600,
+            id="cycle",
+            max_instances=1,
+            coalesce=True,
+        )
         self.scheduler.start()
         _LOG.info(
             "scheduler started (prices=%ds, meter=%ds, mock=%s)",
@@ -56,6 +66,9 @@ class Poller:
         await ingest.startup_backfill(self.price_provider, self.meter_provider, self.settings.tz)
         await self._run_prices()
         await self._run_meter()
+        # Catch up immediately on restart if a cycle boundary was crossed while
+        # the app was down, rather than waiting up to an hour for the interval job.
+        await self._run_cycle_check()
 
     async def _run_prices(self) -> None:
         try:
@@ -68,6 +81,17 @@ class Poller:
             await ingest.ingest_meter(self.meter_provider)
         except Exception:  # noqa: BLE001
             _LOG.exception("meter job error")
+
+    async def _run_cycle_check(self) -> None:
+        try:
+            closed = costing.close_due_cycles(self.settings.tz)
+            if closed:
+                _LOG.info(
+                    "auto-closed billing cycle(s): %s",
+                    [c["cycle_start"].isoformat() for c in closed],
+                )
+        except Exception:  # noqa: BLE001
+            _LOG.exception("cycle check error")
 
     async def stop(self) -> None:
         if self.scheduler.running:

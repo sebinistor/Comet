@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type ConfigModel } from "../lib/api";
+import { usd, kwh } from "../lib/format";
 
 const NUMERIC: (keyof ConfigModel)[] = [
   "billing_cycle_days",
@@ -11,7 +12,7 @@ const NUMERIC: (keyof ConfigModel)[] = [
 ];
 
 const LABELS: Record<keyof ConfigModel, string> = {
-  billing_cycle_start: "Billing cycle start (last invoice / meter-read date)",
+  billing_cycle_start: "Current cycle start (auto-advances when the cycle ends)",
   billing_cycle_days: "Billing cycle length (days)",
   delivery_cents_per_kwh: "Delivery charge (¢/kWh)",
   other_cents_per_kwh: "Other riders (¢/kWh)",
@@ -23,6 +24,7 @@ const LABELS: Record<keyof ConfigModel, string> = {
 export function SettingsForm({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["config"], queryFn: api.config });
+  const { data: cycles } = useQuery({ queryKey: ["cycles"], queryFn: api.cycles });
   const [form, setForm] = useState<ConfigModel | null>(null);
 
   useEffect(() => {
@@ -83,6 +85,27 @@ export function SettingsForm({ onClose }: { onClose: () => void }) {
           Total-bill mode adds delivery, riders, fixed charges and tax on top of the ComEd
           supply price. It is an estimate, not a guaranteed match to your printed bill.
         </p>
+        <p className="muted small">
+          When the cycle reaches its configured length above, it closes on its own: the final
+          estimate is saved below and the start date rolls forward — no manual reset needed.
+        </p>
+
+        {cycles && cycles.length > 0 && (
+          <div className="cycle-history">
+            <h3>Previous cycles</h3>
+            <ul className="cycle-list">
+              {cycles.map((c) => (
+                <li key={c.cycle_start}>
+                  <div>
+                    <div className="value">{c.cycle_start} – {c.cycle_end}</div>
+                    <div className="muted small">{kwh(c.kwh)} · {c.days}-day cycle</div>
+                  </div>
+                  <div className="value">{usd(c.cost_mode === "total" ? c.total_cost : c.supply_cost)}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <footer>
           <button className="primary" disabled={save.isPending} onClick={() => save.mutate(form)}>
