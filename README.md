@@ -9,7 +9,10 @@ energy monitor. It shows:
   your instantaneous draw and the resulting cost rate in $/hr.
 - **Rolling cost today** — estimated spend since local midnight.
 - **Rolling cost this billing cycle** — estimated spend since your last invoice date,
-  with a linear projection to the end of the cycle.
+  with a linear projection to the end of the cycle. When the cycle reaches its
+  configured length, Comet closes it automatically: the final estimate is archived
+  and the cycle start rolls forward on its own, so this never drifts past the
+  configured length waiting for a manual reset.
 
 Cost = Emporia consumption (kWh) × ComEd price (¢/kWh). A **supply-only** view (the
 ComEd hourly supply charge) is shown by default; an **estimated total bill** view
@@ -81,7 +84,9 @@ COMET_MOCK=1 docker compose up --build
 3. Set `EMPORIA_USERNAME` / `EMPORIA_PASSWORD`, map `/data` to
    `/mnt/user/appdata/comet`, publish the WebUI port, and start it.
 4. Open the WebUI, click ⚙, and set your **billing cycle start** date plus (optional)
-   delivery/tax values for total-bill mode.
+   delivery/tax values for total-bill mode. You only need to set this once — once the
+   cycle reaches its configured length, Comet archives it and advances the start date
+   itself.
 
 Deploying via the **Compose Manager** plugin instead of the template? See
 [INSTALL-UNRAID.md](INSTALL-UNRAID.md) — you must set `COMET_DATA_DIR` to an
@@ -117,6 +122,7 @@ UI settings (stored in the DB, editable from ⚙):
 | `GET /api/now` | current price, draw, $/hr |
 | `GET /api/summary` | today + billing-cycle rollups and projection |
 | `GET /api/history?range=day\|cycle` | hourly price / kWh / cumulative cost series |
+| `GET /api/cycles` | past billing cycles, auto-archived when each one closes |
 | `GET /api/config` · `PUT /api/config` | read / update UI settings |
 | `GET /api/health` | scheduler + per-poll status; `degraded` if a poll is failing or stale |
 
@@ -146,7 +152,11 @@ cd backend && pytest
 
 - ComEd prices are **supply-side market prices**. Total-bill mode is an approximation,
   not a guaranteed match to your printed invoice.
-- The billing cycle is tracked by a single `billing_cycle_start` date — update it each
-  invoice (or set it to your monthly meter-read day).
+- The billing cycle is tracked by a single `billing_cycle_start` date. An hourly
+  scheduler job (and one run immediately on every startup) closes the cycle once it
+  passes `billing_cycle_days`, archives its final cost to `GET /api/cycles`, and
+  advances `billing_cycle_start` past it — no manual reset needed. You only need to
+  set the date by hand for the very first cycle, or if you want to realign it to a
+  specific invoice.
 - `pyemvue` uses Emporia's **unofficial** cloud API; poll failures — and pollers that
   have gone silent — are surfaced in `/api/health` and the UI banner.

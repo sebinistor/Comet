@@ -196,8 +196,8 @@ Click the **⚙ (gear)** in the top‑right of the dashboard and fill in:
 | Setting | What to enter |
 | --- | --- |
 | **Cost mode** | `Supply only` to start (just the ComEd hourly price). Switch to `Estimated total bill` once you've entered the rates below. |
-| **Billing cycle start** | The date your **current** ComEd bill period began — the "meter read date" / service‑period start printed on your latest invoice. Comet counts "this billing cycle" from here. |
-| **Billing cycle length (days)** | Usually `30` (used only for the end‑of‑cycle projection). |
+| **Billing cycle start** | The date your **current** ComEd bill period began — the "meter read date" / service‑period start printed on your latest invoice. Comet counts "this billing cycle" from here. You only need to set this once: once the cycle passes its configured length, Comet closes it, archives the final estimate, and advances this date on its own (see **5c note** below). |
+| **Billing cycle length (days)** | Your actual ComEd cycle length (often 29 or 30 — check your last two invoice dates). Used both for the end‑of‑cycle projection **and** to decide when to auto‑close the cycle. |
 | **Delivery charge (¢/kWh)** | From your bill: total *delivery* charges ÷ kWh used. Only used in total mode. |
 | **Other riders (¢/kWh)** | Any per‑kWh line items not covered above (e.g. environmental/efficiency riders). |
 | **Fixed monthly charge ($)** | The flat customer/metering charge for the month. |
@@ -209,6 +209,15 @@ Click **Save**. `/api/summary` recomputes immediately and the cards update.
 > the billing‑cycle start (capped at 45 days). If you set the start date to
 > something well in the past *after* first launch, **restart the container** once
 > so it backfills the fuller range.
+
+> **Auto‑reset note:** you do **not** need to update the billing‑cycle start each
+> month. A scheduled check (hourly, plus once immediately on every container
+> start/restart) closes the cycle as soon as it passes **Billing cycle length
+> (days)**, saves its final cost estimate, and advances the start date to the day
+> the next cycle began — all on its own. Closed cycles show up under **⚙ → Previous
+> cycles** and via `GET /api/cycles`. If "day X of Y" ever shows X greater than Y,
+> it just means the check hasn't run yet (it runs at most an hour behind) — it will
+> self‑correct, or you can force it immediately by restarting the container.
 
 ### 5d. (Optional) tighten security
 
@@ -235,7 +244,8 @@ Path B). Your data in `/mnt/user/appdata/comet` is untouched.
 
 Everything persistent lives in **`/mnt/user/appdata/comet/`**:
 
-- `comet.db` — all price/consumption history and your UI settings
+- `comet.db` — all price/consumption history, archived billing‑cycle history, and
+  your UI settings
 - `emporia_tokens.json` — cached Emporia login
 
 The **CA Appdata Backup** plugin (Community Applications) will include this folder
@@ -255,6 +265,7 @@ start it again.
 | Costs look **~3× too high or too low** | Comet assumes the whole‑home total is Emporia channel `"1,2,3"`. If your device reports the mains differently, the log will show which channels were found — this is a known limitation that may need a one‑line code change in `backend/app/providers/emporia.py`. |
 | `/api/health` shows `"mock": true` | `COMET_MOCK` is set to `1` — change it to `0` and restart. |
 | "This billing cycle" total seems to **start mid‑cycle** | You changed the cycle‑start date after first launch. Restart the container once to backfill. |
+| "This billing cycle" shows **day X of Y with X > Y** (e.g. "day 35 of 29") | Normal for up to an hour after the cycle actually ended — the auto‑close check runs hourly. Restart the container to force it immediately, or just wait; it self‑corrects and archives the closed cycle to **⚙ → Previous cycles**. |
 | Container won't start, log mentions **port in use** | Another container/service holds your host port. Pick a different host port in the container's Port mapping. |
 | Wrong day boundaries | Set `COMET_TZ` to your IANA timezone (e.g. `America/Chicago`) and restart. |
 
